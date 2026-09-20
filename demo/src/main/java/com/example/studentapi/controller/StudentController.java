@@ -3,6 +3,7 @@ package com.example.studentapi.controller;
 import com.example.studentapi.dto.StudentRequest;
 import com.example.studentapi.model.Student;
 import com.example.studentapi.response.ApiResponse;
+import com.example.studentapi.response.PageResponse;
 import com.example.studentapi.service.StudentService;
 
 import jakarta.validation.Valid;
@@ -25,16 +26,29 @@ public class StudentController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<Student>>> getAllStudents() {
+    public ResponseEntity<ApiResponse<PageResponse<Student>>> getAllStudents(
 
-        return ResponseEntity.ok(
-                new ApiResponse<>(
-                        true,
-                        "Students fetched successfully",
-                        service.getAllStudents()
-                )
-        );
-    }
+        @RequestParam(defaultValue = "0") int page,
+
+        @RequestParam(defaultValue = "5") int size,
+
+        @RequestParam(defaultValue = "id") String sortBy,
+
+        @RequestParam(defaultValue = "asc") String direction) {
+
+    return ResponseEntity.ok(
+            new ApiResponse<>(
+                    true,
+                    "Students fetched successfully",
+                    service.getAllStudents(
+                            page,
+                            size,
+                            sortBy,
+                            direction
+                    )
+               )
+    );
+}
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<Student>> getStudentById(
