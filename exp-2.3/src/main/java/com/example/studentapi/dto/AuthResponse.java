@@ -1,4 +1,4 @@
-﻿
+
 package com.example.studentapi.dto;
 
 public class AuthResponse {

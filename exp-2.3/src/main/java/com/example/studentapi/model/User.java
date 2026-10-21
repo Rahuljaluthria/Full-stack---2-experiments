@@ -1,4 +1,4 @@
-﻿
+
 package com.example.studentapi.model;
 
 import jakarta.persistence.*;

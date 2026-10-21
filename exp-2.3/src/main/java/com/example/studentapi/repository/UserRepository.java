@@ -1,4 +1,4 @@
-﻿package com.example.studentapi.repository;
+package com.example.studentapi.repository;
 
 import com.example.studentapi.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
