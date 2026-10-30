@@ -1,9 +1,14 @@
-
+const {
+    isAlreadyProcessed,
+    markAsProcessed
+} = require("../utils/idempotency");
 const kafka = require("../config/kafka");
 
 const consumer = kafka.consumer({
     groupId: "scheduled-post-consumer-group",
 });
+
+const dlqProducer = kafka.producer();
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
@@ -11,16 +16,50 @@ const RETRY_DELAY = 1000;
 async function processPost(post) {
     console.log(`Processing post: ${post.postId}`);
 
-    // Simulate a processing failure for testing
+    if (isAlreadyProcessed(post.eventId)) {
+        console.log("Duplicate event detected. Skipping...");
+        return;
+    }
+
     if (post.simulateFailure === true) {
         throw new Error("Simulated publishing service failure");
     }
 
+    // Simulate successful publishing
     console.log("Post published successfully!");
+
+    markAsProcessed(post.eventId);
+}
+
+async function sendToDLQ(post, error, metadata) {
+    const failedEvent = {
+        originalEvent: post,
+        eventId: post.eventId,
+        failureReason: error.message,
+        retryAttempts: MAX_RETRIES,
+        failedAt: new Date().toISOString(),
+        originalTopic: metadata.topic,
+        originalPartition: metadata.partition,
+        originalOffset: metadata.offset,
+    };
+
+    await dlqProducer.send({
+        topic: "scheduled-posts-dlq",
+        messages: [
+            {
+                key: post.eventId,
+                value: JSON.stringify(failedEvent),
+            },
+        ],
+    });
+
+    console.log("Message successfully moved to DLQ!");
+    console.log(failedEvent);
 }
 
 async function consumePosts() {
     try {
+        await dlqProducer.connect();
         await consumer.connect();
 
         console.log("Consumer connected to Kafka");
@@ -30,13 +69,20 @@ async function consumePosts() {
             fromBeginning: true,
         });
 
+        console.log("Waiting for scheduled posts...\n");
+
         await consumer.run({
             autoCommit: false,
 
-            eachMessage: async ({ topic, partition, message }) => {
+            eachMessage: async ({
+                topic,
+                partition,
+                message,
+            }) => {
                 const post = JSON.parse(message.value.toString());
 
                 let successful = false;
+                let lastError;
 
                 for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
                     try {
@@ -50,7 +96,11 @@ async function consumePosts() {
                         break;
 
                     } catch (error) {
-                        console.log(`Attempt ${attempt} failed: ${error.message}`);
+                        lastError = error;
+
+                        console.log(
+                            `Attempt ${attempt} failed: ${error.message}`
+                        );
 
                         if (attempt < MAX_RETRIES) {
                             console.log("Retrying in 1 second...\n");
@@ -63,25 +113,27 @@ async function consumePosts() {
                 }
 
                 if (successful) {
-                    console.log(`Event ${post.eventId} processed successfully.`);
+                    console.log("Event processed successfully!");
                 } else {
                     console.log("All retry attempts failed.");
-                    console.log("Message will be sent to DLQ in the next stage.");
-                }
+                    console.log("Sending event to DLQ...");
 
-                // Commit only after successful processing.
-                // Permanently failed messages are handled in the DLQ stage.
-                if (successful) {
-                    await consumer.commitOffsets([{
+                    // Send failed event before committing
+                    await sendToDLQ(post, lastError, {
                         topic,
                         partition,
-                        offset: (BigInt(message.offset) + 1n).toString(),
-                    }]);
-                } else {
-                    throw new Error(
-                        `Event ${post.eventId} failed all retry attempts`
-                    );
+                        offset: message.offset,
+                    });
                 }
+
+                // Commit only after success OR confirmed DLQ send
+                await consumer.commitOffsets([{
+                    topic,
+                    partition,
+                    offset: (
+                        BigInt(message.offset) + 1n
+                    ).toString(),
+                }]);
             },
         });
 

@@ -10,10 +10,10 @@ async function publishPost() {
 
         console.log("Producer connected to Kafka");
 
-        const post = {
+    const post = {
     eventId: randomUUID(),
-    postId: "POST102",
-    content: "Testing Kafka retry mechanism",
+    postId: "POST103",
+    content: "Testing Dead Letter Queue",
     scheduledAt: new Date().toISOString(),
     status: "SCHEDULED",
     simulateFailure: true,
