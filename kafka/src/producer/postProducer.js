@@ -11,13 +11,13 @@ async function publishPost() {
         console.log("Producer connected to Kafka");
 
         const post = {
-            eventId: randomUUID(),
-            postId: "POST101",
-            content: "Learning Apache Kafka!",
-            scheduledAt: new Date().toISOString(),
-            status: "SCHEDULED",
-        };
-
+    eventId: randomUUID(),
+    postId: "POST102",
+    content: "Testing Kafka retry mechanism",
+    scheduledAt: new Date().toISOString(),
+    status: "SCHEDULED",
+    simulateFailure: true,
+    };
         await producer.send({
             topic: "scheduled-posts",
             messages: [

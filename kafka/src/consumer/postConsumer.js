@@ -5,6 +5,20 @@ const consumer = kafka.consumer({
     groupId: "scheduled-post-consumer-group",
 });
 
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000;
+
+async function processPost(post) {
+    console.log(`Processing post: ${post.postId}`);
+
+    // Simulate a processing failure for testing
+    if (post.simulateFailure === true) {
+        throw new Error("Simulated publishing service failure");
+    }
+
+    console.log("Post published successfully!");
+}
+
 async function consumePosts() {
     try {
         await consumer.connect();
@@ -16,28 +30,58 @@ async function consumePosts() {
             fromBeginning: true,
         });
 
-        console.log("Waiting for scheduled posts...\n");
-
         await consumer.run({
+            autoCommit: false,
+
             eachMessage: async ({ topic, partition, message }) => {
+                const post = JSON.parse(message.value.toString());
 
-                const post = JSON.parse(
-                    message.value.toString()
-                );
+                let successful = false;
 
-                console.log("Received new post event:");
-                console.log("-----------------------------");
+                for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+                    try {
+                        console.log(
+                            `Attempt ${attempt}/${MAX_RETRIES} for ${post.postId}`
+                        );
 
-                console.log("Topic:", topic);
-                console.log("Partition:", partition);
-                console.log("Event ID:", post.eventId);
-                console.log("Post ID:", post.postId);
-                console.log("Content:", post.content);
-                console.log("Scheduled At:", post.scheduledAt);
-                console.log("Status:", post.status);
+                        await processPost(post);
 
-                console.log("-----------------------------");
-                console.log("Post processed successfully!\n");
+                        successful = true;
+                        break;
+
+                    } catch (error) {
+                        console.log(`Attempt ${attempt} failed: ${error.message}`);
+
+                        if (attempt < MAX_RETRIES) {
+                            console.log("Retrying in 1 second...\n");
+
+                            await new Promise(resolve =>
+                                setTimeout(resolve, RETRY_DELAY)
+                            );
+                        }
+                    }
+                }
+
+                if (successful) {
+                    console.log(`Event ${post.eventId} processed successfully.`);
+                } else {
+                    console.log("All retry attempts failed.");
+                    console.log("Message will be sent to DLQ in the next stage.");
+                }
+
+                // Commit only after successful processing.
+                // Permanently failed messages are handled in the DLQ stage.
+                if (successful) {
+                    await consumer.commitOffsets([{
+                        topic,
+                        partition,
+                        offset: (BigInt(message.offset) + 1n).toString(),
+                    }]);
+                } else {
+                    throw new Error(
+                        `Event ${post.eventId} failed all retry attempts`
+                    );
+                }
             },
         });
 
