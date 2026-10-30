@@ -1,0 +1,23 @@
+{
+  "name": "full-stack2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rahuljaluthria/Full-stack---2-experiments.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Rahuljaluthria/Full-stack---2-experiments/issues"
+  },
+  "homepage": "https://github.com/Rahuljaluthria/Full-stack---2-experiments#readme",
+  "dependencies": {
+    "kafkajs": "^2.2.4"
+  }
+}
