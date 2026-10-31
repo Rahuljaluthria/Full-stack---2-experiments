@@ -1,0 +1,53 @@
+
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ci-cd-practical/**'
+      - '.github/workflows/ci.yml'
+
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ci-cd-practical/**'
+      - '.github/workflows/ci.yml'
+
+jobs:
+  build-and-test:
+    name: Build and Test Application
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ci-cd-practical
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ci-cd-practical/package-lock.json
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Application
+        run: node --check src/server.js && node --check src/app.js
+
+      - name: Run Unit Tests
+        run: npx jest tests/unit --runInBand
+
+      - name: Run Integration Tests
+        run: npx jest tests/integration --runInBand
+
+      - name: Run Contract Tests
+        run: npx jest tests/contract --runInBand
+
+      - name: Run Complete Test Suite
+        run: npm test
