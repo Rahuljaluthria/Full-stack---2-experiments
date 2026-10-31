@@ -36,6 +36,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./ci-cd-practical
+          file: ./ci-cd-practical/Dockerfile
           push: true
           tags: |
             ghcr.io/rahuljaluthria/ci-cd-practical:latest
